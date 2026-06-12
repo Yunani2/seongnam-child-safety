@@ -3014,7 +3014,7 @@ def main():
 </style>
 <script src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={client_id}&submodules=panorama"
         onerror="document.getElementById('pano').innerHTML=
-          '<div class=err>⚠️ API 로드 실패<br><small>NCP 콘솔 → 서비스 URL에 localhost 추가 필요</small></div>'">
+          '<div class=err>⚠️ API 로드 실패<br><small>NCP 콘솔 → 서비스 URL에<br>https://*.streamlit.app 추가 필요</small></div>'">
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head><body>
