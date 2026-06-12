@@ -1,0 +1,26 @@
+# API 키 - 절대 GitHub에 올리면 안 됨
+.streamlit/secrets.toml
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# 로컬 실행 스크립트
+*.bat
+
+# DEM 중복 캐시 (zip에서 자동 추출됨)
+dem_unzipped/
+_dem_cache/
+
+# Claude Code 설정
+.claude/
+
+# 발표 자료 (용량 절약)
+outputs/manual-*/
+
+# 환경
+.env
+.venv/
+venv/
