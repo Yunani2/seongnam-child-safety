@@ -1549,7 +1549,6 @@ def _unused_noop():
         if pano_bytes:
             st.image(pano_bytes, caption="📸 네이버 로드뷰 (자동 분석 가능)", use_container_width=True)
         else:
-            st.warning(f"⚠️ 로드뷰 오류: {pano_err}")
             uploaded = st.file_uploader("📸 스크린샷 직접 업로드", type=["png","jpg","jpeg"],
                                         label_visibility="collapsed")
             if uploaded:
@@ -1951,8 +1950,6 @@ def render_character_chatbot(zones: pd.DataFrame, api_key: str, selected_row,
         img_source_label = "자동 로드"
     else:
         # 2순위: 수동 업로드
-        if _pano_err:
-            st.warning(f"⚠️ 로드뷰 오류: {_pano_err}")
         hint = (
             "위 로드뷰 화면에서 **📷 캡처** 버튼을 누르면 PNG가 저장됩니다. 그 파일을 여기에 업로드하세요."
             if naver_client_id else
