@@ -3108,28 +3108,45 @@ def main():
 </script>
 </body></html>"""
 
-        # 진단: iframe 자체가 렌더링되는지 확인
-        st.components.v1.html(
-            "<div style='background:#fbbf24;color:#000;padding:12px;font-size:13px;"
-            "font-family:sans-serif;border-radius:6px;'>"
-            f"🔑 naver_client_id = <b>{'있음: ' + naver_client_id[:4] + '...' if naver_client_id else '없음(빈값)'}</b>"
-            "</div>",
-            height=50,
-        )
+        # 정적 파노라마 이미지 (서버 사이드 — CSP 우회)
+        if naver_client_id and naver_client_secret:
+            lat  = float(selected_row["위도"])  if selected_row is not None else 37.4201
+            lon  = float(selected_row["경도"])  if selected_row is not None else 127.1265
+            zone_name = selected_row.get("대상시설명", "성남시청 부근") if selected_row is not None else "성남시청 부근"
 
-        if naver_client_id:
-            if selected_row is not None:
-                lat  = float(selected_row["위도"])
-                lon  = float(selected_row["경도"])
-                zone_name = selected_row.get("대상시설명", "")
-                st.components.v1.html(_naver_pano_html(lat, lon, naver_client_id), height=460, scrolling=False)
-                st.caption(f"📍 {zone_name} 주변 네이버 로드뷰")
+            with st.spinner("📸 로드뷰 불러오는 중…"):
+                img_bytes, err = fetch_naver_pano_image(lat, lon, naver_client_id, naver_client_secret)
+
+            if img_bytes:
+                st.image(img_bytes, caption=f"📍 {zone_name} 네이버 로드뷰", use_container_width=True)
             else:
-                default_lat, default_lon = 37.4201, 127.1265
-                st.components.v1.html(_naver_pano_html(default_lat, default_lon, naver_client_id), height=460, scrolling=False)
-                st.caption("💡 지도에서 보호구역 격자를 클릭하면 해당 지점의 로드뷰가 표시됩니다.")
+                # 정적 지도(위성/일반) 폴백
+                map_url = (
+                    f"https://naveropenapi.apigw.naver.com/map-static/v2/raster"
+                    f"?center={lon},{lat}&level=16&w=400&h=300"
+                    f"&markers=type:d|size:mid|pos:{lon}%20{lat}"
+                )
+                try:
+                    import requests as _req
+                    r = _req.get(map_url, headers={
+                        "X-NCP-APIGW-API-KEY-ID": naver_client_id,
+                        "X-NCP-APIGW-API-KEY": naver_client_secret,
+                    }, timeout=8)
+                    if r.status_code == 200 and "image" in r.headers.get("Content-Type", ""):
+                        st.image(r.content, caption=f"📍 {zone_name} 위성지도", use_container_width=True)
+                    else:
+                        st.info(f"🗺️ **{zone_name}** 주변 로드뷰")
+                        st.link_button("네이버 지도에서 보기 →",
+                                       f"https://map.naver.com/?lat={lat}&lng={lon}&zoom=17")
+                except Exception:
+                    st.info(f"🗺️ **{zone_name}** 주변 로드뷰")
+                    st.link_button("네이버 지도에서 보기 →",
+                                   f"https://map.naver.com/?lat={lat}&lng={lon}&zoom=17")
+
+            if selected_row is None:
+                st.caption("💡 지도에서 보호구역 격자를 클릭하면 해당 위치 로드뷰가 표시됩니다.")
         else:
-            st.warning("⚠️ Streamlit Cloud Secrets에 NAVER_CLIENT_ID가 설정되지 않았습니다.")
+            st.info("Naver API 키가 설정되지 않았습니다.")
             if selected_row is not None:
                 lat = float(selected_row["위도"])
                 lon = float(selected_row["경도"])
