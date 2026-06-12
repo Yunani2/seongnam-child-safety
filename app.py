@@ -12,7 +12,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import streamlit as st
-from pyproj import Transformer
+
+try:
+    from pyproj import Transformer
+    HAS_PYPROJ = True
+except Exception:
+    HAS_PYPROJ = False
 
 warnings.filterwarnings("ignore")
 
@@ -343,27 +348,44 @@ def _norm(s: pd.Series) -> pd.Series:
     return (s - lo) / (hi - lo) if hi > lo else pd.Series(0.0, index=s.index)
 
 
+def _haversine_matrix(z_lats, z_lons, b_lats, b_lons):
+    """위경도 배열 두 세트 간 거리 행렬(m) 반환 — pyproj 없을 때 폴백."""
+    R = 6_371_000
+    zla = np.radians(np.asarray(z_lats, dtype=float))[:, np.newaxis]
+    zlo = np.radians(np.asarray(z_lons, dtype=float))[:, np.newaxis]
+    bla = np.radians(np.asarray(b_lats, dtype=float))[np.newaxis, :]
+    blo = np.radians(np.asarray(b_lons, dtype=float))[np.newaxis, :]
+    a = np.sin((bla - zla) / 2) ** 2 + np.cos(zla) * np.cos(bla) * np.sin((blo - zlo) / 2) ** 2
+    return R * 2 * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
+
+
 def enrich_zones(zones: pd.DataFrame, bus: pd.DataFrame, bump, slope_df: pd.DataFrame) -> pd.DataFrame:
     df = zones.copy()
-    tr = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True)
-
-    z_x, z_y = tr.transform(df["경도"].astype(float).values, df["위도"].astype(float).values)
-    zone_xy = np.column_stack([z_x, z_y])
 
     b_lon = pd.to_numeric(bus["경도"].astype(str).str.strip(), errors="coerce")
     b_lat = pd.to_numeric(bus["위도"].astype(str).str.strip(), errors="coerce")
     valid = b_lon.notna() & b_lat.notna()
     bus_c = bus[valid].reset_index(drop=True)
-    b_x, b_y = tr.transform(b_lon[valid].values, b_lat[valid].values)
-    bus_xy = np.column_stack([b_x, b_y])
+
+    if HAS_PYPROJ:
+        tr = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True)
+        z_x, z_y = tr.transform(df["경도"].astype(float).values, df["위도"].astype(float).values)
+        zone_xy = np.column_stack([z_x, z_y])
+        b_x, b_y = tr.transform(b_lon[valid].values, b_lat[valid].values)
+        bus_xy = np.column_stack([b_x, b_y])
+        diffs = zone_xy[:, np.newaxis, :] - bus_xy[np.newaxis, :, :]
+        dists = np.sqrt((diffs**2).sum(axis=2))
+    else:
+        dists = _haversine_matrix(
+            df["위도"].astype(float).values, df["경도"].astype(float).values,
+            b_lat[valid].values, b_lon[valid].values,
+        )
 
     route_cnt = (
         bus_c["시내버스_경유노선번호"].fillna("").astype(str)
         .apply(lambda x: len([r for r in x.split(",") if r.strip()])).values
     )
 
-    diffs = zone_xy[:, np.newaxis, :] - bus_xy[np.newaxis, :, :]
-    dists = np.sqrt((diffs**2).sum(axis=2))
     nearest_idx = dists.argmin(axis=1)
 
     df["dist_nearest_stop_m"] = dists.min(axis=1)
@@ -372,12 +394,18 @@ def enrich_zones(zones: pd.DataFrame, bus: pd.DataFrame, bump, slope_df: pd.Data
     df["cctv_gap"]            = 0.0  # CCTV 지표 미사용
 
     if bump is not None and len(bump) > 0:
-        bp_x, bp_y = tr.transform(
-            pd.to_numeric(bump["경도"], errors="coerce").dropna().values,
-            pd.to_numeric(bump["위도"], errors="coerce").dropna().values,
-        )
-        bp_diffs = zone_xy[:, np.newaxis, :] - np.column_stack([bp_x, bp_y])[np.newaxis, :, :]
-        df["bump_gap"] = (np.sqrt((bp_diffs**2).sum(axis=2)).min(axis=1) > 200).astype(float)
+        bp_lon = pd.to_numeric(bump["경도"], errors="coerce").dropna()
+        bp_lat = pd.to_numeric(bump["위도"], errors="coerce").dropna()
+        if HAS_PYPROJ:
+            bp_x, bp_y = tr.transform(bp_lon.values, bp_lat.values)
+            bp_diffs = zone_xy[:, np.newaxis, :] - np.column_stack([bp_x, bp_y])[np.newaxis, :, :]
+            bp_dists = np.sqrt((bp_diffs**2).sum(axis=2))
+        else:
+            bp_dists = _haversine_matrix(
+                df["위도"].astype(float).values, df["경도"].astype(float).values,
+                bp_lat.values, bp_lon.values,
+            )
+        df["bump_gap"] = (bp_dists.min(axis=1) > 200).astype(float)
     else:
         df["bump_gap"] = 0.0
 

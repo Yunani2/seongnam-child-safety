@@ -1,12 +1,6 @@
 [server]
+headless = true
 port = 8501
-headless = false
-runOnSave = true
 
 [browser]
-serverAddress = "localhost"
 gatherUsageStats = false
-serverPort = 8501
-
-[theme]
-base = "light"
