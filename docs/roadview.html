@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#1a1a1a; }
+  #pano { width:100%; height:100vh; }
+  .err {
+    display:flex; align-items:center; justify-content:center;
+    height:100vh; color:#fff; font-family:'Malgun Gothic',sans-serif;
+    font-size:14px; flex-direction:column; gap:12px;
+    background:#222; text-align:center; padding:20px;
+  }
+  .ctrl-btn {
+    position:fixed; top:10px; z-index:999;
+    background:rgba(0,0,0,0.6); color:#fff; border:none;
+    border-radius:8px; padding:7px 14px; cursor:pointer;
+    font-size:13px; font-family:sans-serif; backdrop-filter:blur(4px);
+  }
+  #fs-btn { right:10px; }
+</style>
+</head>
+<body>
+<div id="pano"></div>
+<button class="ctrl-btn" id="fs-btn" onclick="toggleFS()">⛶ 전체화면</button>
+
+<script>
+  var params = new URLSearchParams(window.location.search);
+  var lat = parseFloat(params.get('lat') || '37.4201');
+  var lng = parseFloat(params.get('lng') || '127.1265');
+  var key = params.get('key') || '';
+
+  if (!key) {
+    document.getElementById('pano').outerHTML =
+      '<div class="err">⚠️ API 키 없음<br><small>key 파라미터가 필요합니다</small></div>';
+  } else {
+    var s = document.createElement('script');
+    s.src = 'https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=' + key + '&submodules=panorama';
+    s.onload = function() {
+      try {
+        new naver.maps.Panorama('pano', {
+          position: new naver.maps.LatLng(lat, lng),
+          pov: { pan: 0, tilt: 0, fov: 100 }
+        });
+      } catch(e) {
+        document.getElementById('pano').outerHTML =
+          '<div class="err">⚠️ 로드뷰 로딩 실패<br><small>' + e.message + '</small></div>';
+      }
+    };
+    s.onerror = function() {
+      document.getElementById('pano').outerHTML =
+        '<div class="err">⚠️ API 로드 실패<br><small>NCP 콘솔 서비스 URL에<br>https://yunani2.github.io 추가 필요</small></div>';
+    };
+    document.head.appendChild(s);
+  }
+
+  function toggleFS() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      document.getElementById('fs-btn').textContent = '⛶ 전체화면';
+    } else {
+      document.documentElement.requestFullscreen();
+      document.getElementById('fs-btn').textContent = '✕ 닫기';
+    }
+  }
+</script>
+</body></html>
