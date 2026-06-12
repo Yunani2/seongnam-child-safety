@@ -3026,6 +3026,13 @@ def main():
 </div>
 <script>
   window.addEventListener('load', function() {{
+    if (typeof naver === 'undefined' || !naver.maps) {{
+      document.getElementById('pano').innerHTML =
+        '<div class=err>⚠️ 네이버 지도 스크립트 로드 실패<br>'
+        + '<small>NCP 콘솔 → Web Service URL에<br>'
+        + window.location.origin + '<br>추가 후 저장하세요</small></div>';
+      return;
+    }}
     try {{
       new naver.maps.Panorama('pano', {{
         position: new naver.maps.LatLng({lat}, {lon}),
