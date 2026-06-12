@@ -32,17 +32,25 @@
     font-weight:600; border:1px solid rgba(96,165,250,0.4);
   }
   .ctrl-btn {
-    position:fixed; top:10px; right:10px; z-index:999;
+    position:fixed; top:10px; z-index:999;
     background:rgba(0,0,0,0.6); color:#fff; border:none;
     border-radius:8px; padding:7px 14px; cursor:pointer;
     font-size:13px; font-family:sans-serif;
+  }
+  #toast {
+    display:none; position:fixed; bottom:16px; left:50%;
+    transform:translateX(-50%); background:rgba(0,0,0,0.75);
+    color:#fff; padding:7px 18px; border-radius:20px;
+    font-size:12px; pointer-events:none; z-index:9999; white-space:nowrap;
   }
 </style>
 </head>
 <body>
 <div id="pano"></div>
 <div id="overlay"></div>
-<button class="ctrl-btn" id="fs-btn" onclick="toggleFS()">⛶ 전체화면</button>
+<button class="ctrl-btn" id="cam-btn" style="right:120px" onclick="takeShot()">📷 캡처</button>
+<button class="ctrl-btn" id="fs-btn"  style="right:10px"  onclick="toggleFS()">⛶ 전체화면</button>
+<div id="toast"></div>
 
 <script>
   var naverUrl = 'https://map.naver.com/v5/?c=' + _lng + ',' + _lat + ',17,0,0,0,dh';
@@ -92,6 +100,49 @@
       document.documentElement.requestFullscreen();
       document.getElementById('fs-btn').textContent = '✕ 닫기';
     }
+  }
+
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    clearTimeout(t._tid);
+    t._tid = setTimeout(function(){ t.style.display = 'none'; }, 3000);
+  }
+
+  function takeShot() {
+    var btn = document.getElementById('cam-btn');
+    btn.disabled = true; btn.textContent = '⏳';
+    // 1순위: WebGL 캔버스 직접 캡처
+    var canvas = document.querySelector('#pano canvas');
+    if (canvas) {
+      try {
+        var url = canvas.toDataURL('image/png');
+        if (url && url.length > 100) { download(url); return; }
+      } catch(e) {}
+    }
+    // 2순위: html2canvas 폴백
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    script.onload = function() {
+      html2canvas(document.getElementById('pano'), {useCORS:true, allowTaint:true, logging:false})
+        .then(function(c){ download(c.toDataURL('image/png')); })
+        .catch(function(){ showToast('캡처 실패 — 브라우저 화면 캡처를 이용하세요.'); })
+        .finally(function(){ btn.textContent = '📷 캡처'; btn.disabled = false; });
+    };
+    script.onerror = function() {
+      showToast('캡처 라이브러리 로드 실패'); btn.textContent = '📷 캡처'; btn.disabled = false;
+    };
+    document.head.appendChild(script);
+  }
+
+  function download(url) {
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'roadview_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.png';
+    a.click();
+    showToast('📷 저장되었습니다!');
+    var btn = document.getElementById('cam-btn');
+    btn.textContent = '📷 캡처'; btn.disabled = false;
   }
 </script>
 </body></html>
