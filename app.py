@@ -3108,6 +3108,15 @@ def main():
 </script>
 </body></html>"""
 
+        # 진단: iframe 자체가 렌더링되는지 확인
+        st.components.v1.html(
+            "<div style='background:#fbbf24;color:#000;padding:12px;font-size:13px;"
+            "font-family:sans-serif;border-radius:6px;'>"
+            f"🔑 naver_client_id = <b>{'있음: ' + naver_client_id[:4] + '...' if naver_client_id else '없음(빈값)'}</b>"
+            "</div>",
+            height=50,
+        )
+
         if naver_client_id:
             if selected_row is not None:
                 lat  = float(selected_row["위도"])
@@ -3120,7 +3129,7 @@ def main():
                 st.components.v1.html(_naver_pano_html(default_lat, default_lon, naver_client_id), height=460, scrolling=False)
                 st.caption("💡 지도에서 보호구역 격자를 클릭하면 해당 지점의 로드뷰가 표시됩니다.")
         else:
-            st.warning("⚠️ 사이드바에 Naver Maps Client ID를 입력하면 여기서 바로 로드뷰를 볼 수 있습니다.")
+            st.warning("⚠️ Streamlit Cloud Secrets에 NAVER_CLIENT_ID가 설정되지 않았습니다.")
             if selected_row is not None:
                 lat = float(selected_row["위도"])
                 lon = float(selected_row["경도"])
