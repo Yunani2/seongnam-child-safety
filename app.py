@@ -1499,8 +1499,9 @@ def _template_comment(row: pd.Series) -> str:
 # ── 안전이 캐릭터 챗봇 ─────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=300)
-def fetch_naver_pano_image(lat: float, lon: float, client_id: str, client_secret: str) -> bytes | None:
-    """Naver 파노라마 Static API로 로드뷰 이미지를 서버에서 직접 가져온다."""
+def fetch_naver_pano_image(lat: float, lon: float, client_id: str, client_secret: str):
+    """Naver 파노라마 Static API로 로드뷰 이미지를 서버에서 직접 가져온다.
+    반환값: (bytes, None) 성공 | (None, 오류문자열) 실패"""
     try:
         import requests as _req
         resp = _req.get(
@@ -1513,10 +1514,10 @@ def fetch_naver_pano_image(lat: float, lon: float, client_id: str, client_secret
             timeout=8,
         )
         if resp.status_code == 200 and "image" in resp.headers.get("Content-Type", ""):
-            return resp.content
-    except Exception:
-        pass
-    return None
+            return resp.content, None
+        return None, f"HTTP {resp.status_code}: {resp.text[:200]}"
+    except Exception as e:
+        return None, str(e)
 
 
 def _unused_noop():
@@ -1541,14 +1542,14 @@ def _unused_noop():
     uploaded = None
     if selected_row is not None and naver_client_id and naver_client_secret:
         with st.spinner("📸 로드뷰 이미지 로딩 중…"):
-            pano_bytes = fetch_naver_pano_image(
+            pano_bytes, pano_err = fetch_naver_pano_image(
                 float(selected_row["위도"]), float(selected_row["경도"]),
                 naver_client_id, naver_client_secret,
             )
         if pano_bytes:
             st.image(pano_bytes, caption="📸 네이버 로드뷰 (자동 분석 가능)", use_container_width=True)
         else:
-            st.caption("⚠️ 로드뷰 이미지를 가져오지 못했습니다. NCP 콘솔 설정을 확인하세요.")
+            st.warning(f"⚠️ 로드뷰 오류: {pano_err}")
             uploaded = st.file_uploader("📸 스크린샷 직접 업로드", type=["png","jpg","jpeg"],
                                         label_visibility="collapsed")
             if uploaded:
@@ -1935,9 +1936,10 @@ def render_character_chatbot(zones: pd.DataFrame, api_key: str, selected_row,
 
     # 1순위: Naver Static API 자동 fetch
     auto_bytes = None
+    _pano_err = None
     if selected_row is not None and naver_client_id and naver_client_secret:
         with st.spinner("🗺️ 현장 로드뷰 이미지 불러오는 중…"):
-            auto_bytes = fetch_naver_pano_image(
+            auto_bytes, _pano_err = fetch_naver_pano_image(
                 float(selected_row["위도"]), float(selected_row["경도"]),
                 naver_client_id, naver_client_secret,
             )
@@ -1949,6 +1951,8 @@ def render_character_chatbot(zones: pd.DataFrame, api_key: str, selected_row,
         img_source_label = "자동 로드"
     else:
         # 2순위: 수동 업로드
+        if _pano_err:
+            st.warning(f"⚠️ 로드뷰 오류: {_pano_err}")
         hint = (
             "위 로드뷰 화면에서 **📷 캡처** 버튼을 누르면 PNG가 저장됩니다. 그 파일을 여기에 업로드하세요."
             if naver_client_id else
